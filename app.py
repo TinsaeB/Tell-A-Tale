@@ -63,8 +63,7 @@ def narrate_text_edge_tts(text, voice="en-US-JennyNeural"):
 
 st.set_page_config(page_title="Tell-A-Tale: AI Story Generator & Narrator", layout="centered")
 st.title("📚 Tell-A-Tale: AI Story Generator & Narrator")
-st.write("Generate and listen to AI-powered tales using your local Ollama LLM!")
-
+st.caption("Generate, listen, save, and share AI-powered tales with narration!")
 
 if 'tale' not in st.session_state:
     st.session_state['tale'] = ''
@@ -73,68 +72,79 @@ if 'audio_bytes' not in st.session_state:
 if 'audio_file' not in st.session_state:
     st.session_state['audio_file'] = ''
 
-st.title("📚 Tell-A-Tale: AI Story Generator & Narrator")
-st.caption("Generate, listen, save, and share AI-powered tales with narration!")
+# --- Main UI Layout (No Tabs, Modern Minimal Flow) ---
 
-tab_gen, tab_share = st.tabs(["📝 Tale Generator", "🔊 Narration & Save/Share"])
-with tab_gen:
-    st.header("Tale Generator")
-    st.write("1. Select your tale type, LLM, and narration style.")
-    st.write("2. Enter a prompt or theme, then click 'Generate Tale'.")
-    models = get_ollama_models()
-    selected_model = st.selectbox(
-        "Select LLM model:", models, index=models.index("phi4") if "phi4" in models else 0,
-        help="Choose which local LLM to use for story generation.", key="select_model_gen"
-    )
-    tale_types = [
-        "Biblical", "Historical", "Fun Facts", "Fairy Tale", "Science Fiction", "Fantasy", "Adventure", "Mystery", "Horror", "Comedy", "Romance", "Legend/Myth", "Children's Story"
-    ]
-    selected_tale_type = st.selectbox(
-        "Choose the kind of tale:", tale_types, index=3, key="select_tale_type_gen"
-    )
+with st.container():
+    st.markdown("## ✨ Generate Your Tale")
+    cols = st.columns([1, 1, 1])
+    with cols[0]:
+        models = get_ollama_models()
+        selected_model = st.selectbox(
+            "Model", models, index=models.index("phi4") if "phi4" in models else 0,
+            help="Choose which local LLM to use for story generation.", key="select_model_gen"
+        )
+    with cols[1]:
+        tale_types = [
+            "Biblical", "Historical", "Fun Facts", "Fairy Tale", "Science Fiction", "Fantasy", "Adventure", "Mystery", "Horror", "Comedy", "Romance", "Legend/Myth", "Children's Story"
+        ]
+        selected_tale_type = st.selectbox(
+            "Tale Type", tale_types, index=3, key="select_tale_type_gen"
+        )
+    with cols[2]:
+        narration_type = st.radio(
+            "Narration",
+            ("Standard (Offline)", "Human-like (Edge TTS)"),
+            help="Choose the voice style for narration.", key="narration_type_gen"
+        )
+
+    st.markdown("---")
     prompt = st.text_area(
-        "Enter a prompt, genre, or theme for your tale:", height=100, help="What should the story be about?", key="prompt_gen"
+        "Prompt or Theme",
+        placeholder="e.g. A magical forest adventure for children",
+        height=80,
+        help="What should the story be about?",
+        key="prompt_gen"
     )
-    narration_type = st.radio(
-        "Select narration type:",
-        ("Standard (Offline)", "Human-like (Edge TTS)"),
-        help="Choose the voice style for narration.", key="narration_type_gen"
-    )
+
     # Voice selection
     pyttsx3_voice_id = None
     edge_voice = "en-US-JennyNeural"
-    pyttsx3_voice_label = None
     if narration_type == "Standard (Offline)":
         import pyttsx3
         engine = pyttsx3.init()
         voices = engine.getProperty('voices')
         pyttsx3_voice_options = [(v.id, v.name) for v in voices]
         pyttsx3_voice_id, pyttsx3_voice_label = st.selectbox(
-            "Choose offline voice:", pyttsx3_voice_options, format_func=lambda x: x[1], key="pyttsx3_voice_select"
+            "Offline Voice", pyttsx3_voice_options, format_func=lambda x: x[1], key="pyttsx3_voice_select"
         )
     else:
         from edge_voices import EDGE_TTS_VOICES
         edge_voice, edge_voice_label = st.selectbox(
-            "Choose Edge TTS voice:", EDGE_TTS_VOICES, format_func=lambda x: x[1], key="edge_voice_select"
+            "Edge TTS Voice", EDGE_TTS_VOICES, format_func=lambda x: x[1], key="edge_voice_select"
         )
-    generate = st.button("✨ Generate Tale", use_container_width=True, key="generate_btn_gen")
+
+    st.markdown("---")
+    gen_col, narr_col = st.columns([2, 1])
+    with gen_col:
+        generate = st.button("✨ Generate Tale", use_container_width=True, key="generate_btn_gen")
+    with narr_col:
+        narrate = st.button("🎤 Narrate Tale", use_container_width=True, key="narrate_btn")
+
+    # Tale Generation
     if generate and prompt.strip():
         with st.spinner(f"Generating a {selected_tale_type} tale using {selected_model} model..."):
             tale = generate_tale(prompt, selected_model, selected_tale_type)
             st.session_state['tale'] = tale
             st.session_state['audio_bytes'] = None
             st.session_state['audio_file'] = ''
-    if st.session_state['tale']:
-        st.success("Tale generated! Switch to the 'Narration & Save/Share' tab to listen, save, or share.")
-        st.markdown("#### Preview:")
-        st.write(st.session_state['tale'])
 
-with tab_share:
-    st.header("Narration & Save/Share")
+    # Tale Display
     if st.session_state['tale']:
-        st.markdown("#### Your Tale:")
+        st.markdown("### 📖 Your Tale")
         st.write(st.session_state['tale'])
-        if st.button("🎤 Narrate Tale", use_container_width=True):
+        st.markdown("---")
+        # Narration
+        if narrate:
             with st.spinner("Narrating tale..."):
                 if narration_type == "Human-like (Edge TTS)":
                     audio_file = narrate_text_edge_tts(st.session_state['tale'], voice=edge_voice)
@@ -144,7 +154,7 @@ with tab_share:
                 st.session_state['audio_bytes'] = audio_bytes
                 st.session_state['audio_file'] = audio_file
                 os.remove(audio_file)
-        # Only show audio bar if audio exists (and only once)
+        # Audio Player & Download/Share
         if st.session_state['audio_bytes']:
             st.audio(st.session_state['audio_bytes'], format='audio/mp3')
             tale_filename = 'tale.txt'
@@ -154,28 +164,20 @@ with tab_share:
             st.download_button("💾 Save Audio (.mp3)", st.session_state['audio_bytes'], file_name=audio_filename, mime='audio/mp3', help="Download the narration as an MP3 file.")
             # --- Sharing Section ---
             import urllib.parse
-            
             import pyperclip
-            from io import BytesIO
-
             # WhatsApp share for text
             whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(st.session_state['tale'])}"
             st.markdown(f"[📤 Share Tale on WhatsApp]({whatsapp_url})", unsafe_allow_html=True)
-
             # Telegram share for text
             telegram_url = f"https://t.me/share/url?url=&text={urllib.parse.quote(st.session_state['tale'])}"
             st.markdown(f"[📤 Share Tale on Telegram]({telegram_url})", unsafe_allow_html=True)
-
             # Email share for text
             email_url = f"mailto:?subject=Tell-A-Tale%20Story&body={urllib.parse.quote(st.session_state['tale'])}"
             st.markdown(f"[📤 Share Tale by Email]({email_url})", unsafe_allow_html=True)
-
             # Clipboard copy
             if st.button("📋 Copy Tale to Clipboard"):
                 pyperclip.copy(st.session_state['tale'])
                 st.success("Tale copied to clipboard!")
-
-            
             # Zip for sharing
             with tempfile.TemporaryDirectory() as tmpdir:
                 tale_path = os.path.join(tmpdir, tale_filename)
@@ -189,6 +191,6 @@ with tab_share:
                     st.download_button("📤 Share Tale & Audio (.zip)", zip_bytes, file_name=zip_filename, mime='application/zip', help="Download a ZIP containing both the tale and narration for easy sharing.")
             st.info("To share audio on WhatsApp, Telegram, or Email: Download the MP3, then upload/send it in your chat or email.")
         else:
-            st.warning("Please narrate the tale first to enable saving or sharing audio.")
+            st.info("Click 'Narrate Tale' to generate audio for your story.")
     else:
-        st.info("Generate a tale first in the 'Tale Generator' tab.")
+        st.info("Enter a prompt and generate a tale to get started.")
