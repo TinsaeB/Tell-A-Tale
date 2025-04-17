@@ -21,6 +21,8 @@ Tell-A-Tale is an interactive desktop web application that lets you generate, na
 - **Microsoft Edge TTS** (for human-like voices)
 - **Internet connection** (for sharing features)
 
+> **No external database required. All data is stored locally in `tell_a_tale.db` using SQLite.**
+
 ### Python Dependencies
 - See `requirements.txt` for all required Python packages:
   - `streamlit`, `requests`, `pyttsx3`, `edge-tts`, `pyperclip`
@@ -68,8 +70,12 @@ streamlit run app.py
 
 ## Usage Guide
 
-### 1. Tale Generation Tab
-- Select the tale type, LLM model, and enter your prompt/theme.
+### Saving and Managing Tales
+
+Tales and their narrations are saved to a local SQLite database (`tell_a_tale.db`).
+
+- Use the sidebar to **view, search, filter, edit, delete, and play/download** any saved tale.
+- No setup or extra database required—everything works out of the box.
 - Choose narration type (offline or Edge TTS) and select a voice.
 - Click **Generate Tale**. The story will appear in the preview.
 

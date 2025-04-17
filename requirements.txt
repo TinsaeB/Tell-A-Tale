@@ -3,4 +3,3 @@ requests
 pyttsx3
 edge-tts
 pyperclip
-pymongo
