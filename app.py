@@ -189,8 +189,78 @@ with st.container():
                 with open(zip_path, 'rb') as f:
                     zip_bytes = f.read()
                     st.download_button("📤 Share Tale & Audio (.zip)", zip_bytes, file_name=zip_filename, mime='application/zip', help="Download a ZIP containing both the tale and narration for easy sharing.")
+            # --- MongoDB Save Button ---
+            from db_utils import save_tale_to_db
+            if st.button("💾 Save Tale to Database"):
+                doc_id = save_tale_to_db(
+                    prompt,
+                    selected_tale_type,
+                    selected_model,
+                    st.session_state['tale'],
+                    st.session_state['audio_bytes']
+                )
+                st.success(f"Tale saved to database! Document ID: {doc_id}")
             st.info("To share audio on WhatsApp, Telegram, or Email: Download the MP3, then upload/send it in your chat or email.")
         else:
             st.info("Click 'Narrate Tale' to generate audio for your story.")
     else:
         st.info("Enter a prompt and generate a tale to get started.")
+
+# --- Saved Tales Section ---
+st.markdown("---")
+st.markdown("## 📚 View Saved Tales")
+from db_utils import get_all_tales, get_tale_by_id, search_tales, update_tale_text, delete_tale
+
+# --- Search and Filtering ---
+search_query = st.text_input("🔎 Search tales (prompt or text):", "")
+type_filter = st.selectbox("Filter by Tale Type:", ["All"] + [
+    "Biblical", "Historical", "Fun Facts", "Fairy Tale", "Science Fiction", "Fantasy", "Adventure", "Mystery", "Horror", "Comedy", "Romance", "Legend/Myth", "Children's Story"
+], key="type_filter")
+model_filter = st.selectbox("Filter by Model:", ["All"] + list({t['model'] for t in get_all_tales()}), key="model_filter")
+
+filtered_tales = search_tales(
+    query=search_query if search_query else None,
+    type_filter=None if type_filter == "All" else type_filter,
+    model_filter=None if model_filter == "All" else model_filter
+)
+
+if filtered_tales:
+    tale_options = [
+        f"[{t['created_at'].strftime('%Y-%m-%d %H:%M')}] {t['tale_type']} | {t['model']} | {t['prompt'][:30]}..."
+        for t in filtered_tales
+    ]
+    selected_idx = st.selectbox("Select a saved tale to view:", range(len(filtered_tales)), format_func=lambda i: tale_options[i])
+    selected_tale = filtered_tales[selected_idx]
+    st.markdown(f"**Prompt:** {selected_tale['prompt']}")
+    st.markdown(f"**Tale Type:** {selected_tale['tale_type']}")
+    st.markdown(f"**Model:** {selected_tale['model']}")
+    st.markdown(f"**Date:** {selected_tale['created_at'].strftime('%Y-%m-%d %H:%M')}")
+    st.markdown("---")
+    st.markdown("#### Tale Text:")
+    # --- Edit Tale Text ---
+    edited_text = st.text_area("Edit Tale Text:", selected_tale['tale_text'], key=f"edit_{selected_tale['id']}")
+    col1, col2, col3 = st.columns([1,1,1])
+    with col1:
+        if st.button("💾 Save Changes", key=f"save_{selected_tale['id']}"):
+            updated = update_tale_text(selected_tale['id'], edited_text)
+            if updated:
+                st.success("Tale updated!")
+            else:
+                st.warning("No changes made or update failed.")
+    with col2:
+        if st.button("❌ Delete Tale", key=f"delete_{selected_tale['id']}"):
+            deleted = delete_tale(selected_tale['id'])
+            if deleted:
+                st.success("Tale deleted! Please refresh to update the list.")
+            else:
+                st.warning("Delete failed.")
+    with col3:
+        if st.button("▶️ Play Narration", key=f"play_{selected_tale['id']}"):
+            tale_doc = get_tale_by_id(selected_tale['id'])
+            if tale_doc and tale_doc.get('audio_bytes'):
+                st.audio(tale_doc['audio_bytes'], format='audio/mp3')
+                st.download_button("💾 Download Narration (.mp3)", tale_doc['audio_bytes'], file_name='saved_tale_narration.mp3', mime='audio/mp3')
+            else:
+                st.warning("No narration audio found for this tale.")
+else:
+    st.info("No tales found matching your criteria.")
