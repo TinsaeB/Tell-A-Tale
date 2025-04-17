@@ -1,0 +1,5 @@
+streamlit
+requests
+pyttsx3
+edge-tts
+pyperclip
